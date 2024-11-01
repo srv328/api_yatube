@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from posts.models import Post, Comment, Group
 from .serializers import PostSerializer, CommentSerializer, GroupSerializer
@@ -8,7 +8,7 @@ from .serializers import PostSerializer, CommentSerializer, GroupSerializer
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -26,7 +26,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return Comment.objects.filter(post_id=self.kwargs['post_id'])
@@ -35,7 +35,18 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user,
                         post_id=self.kwargs['post_id'])
 
+    def perform_update(self, serializer):
+        if serializer.instance.author != self.request.user:
+            raise PermissionDenied('Изменение чужого комментария запрещено!')
+        super().perform_update(serializer)
+
+    def perform_destroy(self, instance):
+        if instance.author != self.request.user:
+            raise PermissionDenied('Удаление чужого комментария запрещено!')
+        super().perform_destroy(instance)
+
 
 class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
+    permission_classes = [IsAuthenticated]
